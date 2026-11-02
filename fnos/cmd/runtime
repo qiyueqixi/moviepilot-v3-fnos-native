@@ -1,0 +1,56 @@
+#!/bin/bash
+
+runtime_expected_digest() {
+    local metadata="${TRIM_APPDEST}/runtime/expected.json"
+    [ -f "$metadata" ] || return 0
+    python3 - "$metadata" <<'PY'
+import json, re, sys
+value = json.load(open(sys.argv[1], encoding='utf-8'))['sha256']
+if not re.fullmatch('[0-9a-f]{64}', value):
+    raise SystemExit('Invalid runtime digest')
+print(value)
+PY
+}
+
+runtime_is_current() {
+    local venv="${TRIM_PKGVAR}/venv"
+    [ -r "$venv/native-runtime.json" ] && [ -x "$venv/bin/python3" ] || return 1
+    local expected
+    expected="$(runtime_expected_digest)" || return 1
+    [ -n "$expected" ] || return 0
+    [ -r "${TRIM_PKGVAR}/.runtime.sha256" ] || return 1
+    [ "$(cat "${TRIM_PKGVAR}/.runtime.sha256")" = "$expected" ]
+}
+
+runtime_install_archive() {
+    local archive="$1"
+    local expected actual
+    expected="$(runtime_expected_digest)" || return 1
+    actual="$(sha256sum "$archive")" || return 1
+    actual="${actual%% *}"
+    if [ -n "$expected" ] && [ "$actual" != "$expected" ]; then
+        echo "Runtime SHA-256 mismatch; upload the runtime from the same FPK release." >&2
+        return 1
+    fi
+    runtime_is_current && return 0
+    local stage
+    stage="$(mktemp -d "${TRIM_PKGVAR}/.runtime-install.XXXXXX")" || return 1
+    if ! tar -xzf "$archive" -C "$stage" || [ ! -r "$stage/venv/native-runtime.json" ] || [ ! -x "$stage/venv/bin/python3" ]; then
+        rm -rf -- "$stage"
+        return 1
+    fi
+    chmod -R u+rwX,go+rX "$stage/venv" 2>/dev/null || true
+    local backup="${TRIM_PKGVAR}/.venv.previous"
+    rm -rf -- "$backup"
+    if [ -d "${TRIM_PKGVAR}/venv" ]; then
+        mv "${TRIM_PKGVAR}/venv" "$backup" || { rm -rf -- "$stage"; return 1; }
+    fi
+    if ! mv "$stage/venv" "${TRIM_PKGVAR}/venv"; then
+        [ ! -d "$backup" ] || mv "$backup" "${TRIM_PKGVAR}/venv"
+        rm -rf -- "$stage"
+        return 1
+    fi
+    rmdir "$stage"
+    printf '%s\n' "$actual" > "${TRIM_PKGVAR}/.runtime.sha256"
+    rm -rf -- "$backup"
+}

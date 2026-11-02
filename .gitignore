@@ -1,0 +1,9 @@
+.reference/
+.build/
+dist/
+__pycache__/
+*.pyc
+app.tgz
+fnos/runtime/
+fnos/resources/*.so
+fnos/resources/*.bin

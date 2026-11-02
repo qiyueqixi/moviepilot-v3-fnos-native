@@ -1,0 +1,12 @@
+{
+  "repository": "jxxghp/MoviePilot",
+  "version": "3.2.3",
+  "commit": "5662004dca2be1151de7b50784e3aca6a81544d5",
+  "frontend": "3.2.3",
+  "supported_major": 3,
+  "native_revision": 1,
+  "python": "3.14.10",
+  "python_release": "20261026",
+  "node": "22.21.1",
+  "resources_commit": "d8e17830f695d8656d1d2c36880d000e9278e422"
+}

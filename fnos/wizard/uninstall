@@ -1,0 +1,17 @@
+[
+  {
+    "stepTitle": "卸载 MoviePilot",
+    "items": [
+      {
+        "type": "radio",
+        "field": "wizard_delete_data",
+        "label": "应用数据处理方式",
+        "initValue": "false",
+        "options": [
+          { "label": "保留现有数据", "value": "false" },
+          { "label": "删除全部应用数据", "value": "true" }
+        ]
+      }
+    ]
+  }
+]

@@ -1,0 +1,17 @@
+appname         = moviepilot-v3
+version         = 3.2.3-1
+display_name    = MoviePilot V3
+platform        = x86
+maintainer      = jxxghp
+maintainer_url  = https://github.com/jxxghp/MoviePilot
+distributor     = qiyueqixi
+distributor_url = https://github.com/qiyueqixi/moviepilot-v3-fnos-native
+desktop_uidir   = ui
+desktop_applaunchname = moviepilot-v3.Application
+checkport       = false
+ctl_stop        = true
+disable_authorization_path = false
+desc            = 影视自动化管理工具，支持自动订阅、下载、整理和通知。
+source          = thirdparty
+os_min_version  = 1.2.0
+checksum        =

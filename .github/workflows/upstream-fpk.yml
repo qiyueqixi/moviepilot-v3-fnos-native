@@ -1,0 +1,161 @@
+name: Upstream V3 native FPK
+
+on:
+  schedule:
+    - cron: '37 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Stable V3 version (blank = latest)'
+        type: string
+      force:
+        description: 'Rebuild an existing draft release'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: upstream-v3-fpk
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-22.04
+    outputs:
+      build: ${{ steps.plan.outputs.build }}
+      release_tag: ${{ steps.plan.outputs.release_tag }}
+      fpk_version: ${{ steps.plan.outputs.fpk_version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Resolve stable upstream and exact frontend
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_VERSION: ${{ inputs.version }}
+          FORCE_BUILD: ${{ inputs.force }}
+        run: |
+          args=()
+          [ -z "$REQUESTED_VERSION" ] || args+=(--version "$REQUESTED_VERSION")
+          [ "$FORCE_BUILD" != true ] || args+=(--force)
+          python scripts/upstream.py "${args[@]}"
+      - name: Gateway, runtime upgrade and proxy regressions
+        run: |
+          node scripts/test-session.cjs
+          node scripts/test-gateway.cjs
+          python scripts/test-runtime.py
+          python scripts/test-upstream.py
+          for script in fnos/cmd/* fnos/resources/backend-supervisor.sh; do bash -n "$script"; done
+      - uses: actions/upload-artifact@v4
+        if: steps.plan.outputs.build == 'true'
+        with:
+          name: resolved-inputs
+          path: upstream.json
+          retention-days: 1
+
+  build:
+    needs: check
+    if: needs.check.outputs.build == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: x86
+            runner: ubuntu-22.04
+          - platform: arm
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PLATFORM: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: resolved-inputs
+          path: .
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned build tools
+        run: |
+          python -m pip install uv==0.13.6 ziglang==0.15.2
+          python -c 'import pathlib,ziglang; print("ZIG=" + str(pathlib.Path(ziglang.__file__).parent / "zig"))' >> "$GITHUB_ENV"
+      - name: Build standalone Python runtime and both FPK variants
+        run: python scripts/build-v3.py --platform "$PLATFORM" --uv uv --zig "$ZIG"
+      - name: Test authorization and patch idempotence
+        run: |
+          python scripts/test-native.py
+          python scripts/patch-v3.py .build/source
+          python scripts/patch-v3.py .build/source
+      - name: Boot shipped Linux runtime and application
+        run: python scripts/test-backend-linux.py --platform "$PLATFORM"
+      - name: Verify delivered archives
+        run: |
+          python scripts/verify-packages.py --platform "$PLATFORM"
+          mv dist/BUILD_INFO.json "dist/BUILD_INFO-${PLATFORM}.json"
+          mv dist/SHA256SUMS.txt "dist/SHA256SUMS-${PLATFORM}.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fpk-${{ matrix.platform }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 1
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: diagnostic-${{ matrix.platform }}
+          path: .build/*.log
+          retention-days: 3
+          if-no-files-found: ignore
+
+  release:
+    needs: [check, build]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ needs.check.outputs.release_tag }}
+      FPK_VERSION: ${{ needs.check.outputs.fpk_version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - uses: actions/download-artifact@v4
+        with:
+          name: resolved-inputs
+          path: .
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: fpk-*
+          path: dist
+          merge-multiple: true
+      - name: Merge provenance and verify complete release
+        run: |
+          python scripts/release.py
+          python scripts/verify-packages.py
+      - name: Create or resume draft release
+        run: |
+          if gh release view "$RELEASE_TAG" --json isDraft > .build-release.json 2>/dev/null; then
+            python -c 'import json; assert json.load(open(".build-release.json"))["isDraft"], "Refusing to overwrite a published release"'
+            gh release edit "$RELEASE_TAG" --notes-file dist/RELEASE_NOTES.md
+          else
+            gh release create "$RELEASE_TAG" --draft --target "$GITHUB_SHA" \
+              --title "MoviePilot V3 fnOS $FPK_VERSION" --notes-file dist/RELEASE_NOTES.md
+          fi
+          gh release upload "$RELEASE_TAG" dist/* --clobber
+          gh release view "$RELEASE_TAG" --json url --jq .url >> "$GITHUB_STEP_SUMMARY"

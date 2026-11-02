@@ -1,0 +1,7 @@
+{
+    "defaults": {
+        "run-as": "package"
+    },
+    "username": "moviepilot-v3",
+    "groupname": "moviepilot-v3"
+}

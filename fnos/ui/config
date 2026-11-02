@@ -1,0 +1,16 @@
+{
+    ".url": {
+        "moviepilot-v3.Application":
+        {
+            "title": "MoviePilot V3",
+            "desc": "影视自动化管理工具",
+            "icon": "images/{0}.png",
+            "type": "iframe",
+            "protocol": "",
+            "gatewayPrefix": "/app/moviepilot-v3",
+            "gatewaySocket": "moviepilot-v3.sock",
+            "url": "/app/moviepilot-v3/?fnos=1",
+            "allUsers": true
+        }
+    }
+}
