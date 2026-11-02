@@ -23,6 +23,9 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-22.04
+    # GitHub only exposes draft releases to tokens with push access.
+    permissions:
+      contents: write
     outputs:
       build: ${{ steps.plan.outputs.build }}
       release_tag: ${{ steps.plan.outputs.release_tag }}
