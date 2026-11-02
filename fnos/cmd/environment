@@ -1,0 +1,15 @@
+#!/bin/bash
+
+prepare_native_environment() {
+    # The package account's passwd HOME may be /home/moviepilot-v3, which fnOS
+    # does not provision. Keep all writable user state under our private data.
+    export HOME="${TRIM_PKGVAR:?}/home"
+    export XDG_CACHE_HOME="${TRIM_PKGVAR}/cache"
+    export XDG_CONFIG_HOME="${HOME}/.config"
+    export XDG_DATA_HOME="${HOME}/.local/share"
+    export CLOAKBROWSER_CACHE_DIR="${XDG_CACHE_HOME}/cloakbrowser"
+    export PLAYWRIGHT_BROWSERS_PATH="${XDG_CACHE_HOME}/ms-playwright"
+    mkdir -p -- "$HOME" "$XDG_CACHE_HOME" "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" \
+        "$CLOAKBROWSER_CACHE_DIR" "$PLAYWRIGHT_BROWSERS_PATH" || return 1
+    [ -w "$HOME" ] && [ -w "$CLOAKBROWSER_CACHE_DIR" ] || return 1
+}

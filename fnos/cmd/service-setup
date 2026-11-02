@@ -3,6 +3,7 @@ set -e
 
 VENV="${TRIM_PKGVAR}/venv"
 . "$(dirname "${BASH_SOURCE[0]}")/runtime"
+. "$(dirname "${BASH_SOURCE[0]}")/environment"
 
 prepare_system_log() {
     local system_log="/var/log/apps/${TRIM_APPNAME:-moviepilot-v3}.log"
@@ -60,6 +61,7 @@ save_app_proxy() {
 
 service_postinst() {
     mkdir -p "${TRIM_PKGVAR}/core"
+    prepare_native_environment
     local path
     local -a shares
     IFS=: read -r -a shares <<< "${TRIM_DATA_SHARE_PATHS:-}"

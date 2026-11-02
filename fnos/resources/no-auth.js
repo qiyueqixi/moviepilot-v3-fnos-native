@@ -41,14 +41,8 @@
     headers.delete('Authorization')
     return originalFetch.call(this, input, { ...init, headers })
   }
-  try {
-    const request = new XMLHttpRequest()
-    request.open('POST', new URL('v1/login/access-token', apiBase).href, false)
-    request.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded')
-    request.send('username=admin&password=fnos')
-    if (request.status !== 200) return
-    const session = JSON.parse(request.responseText)
-    if (!session.access_token || !Number.isInteger(session.user_id)) return
+  function storeSession (session) {
+    if (!session.access_token || !Number.isInteger(session.user_id)) throw new Error('Invalid native session')
     localStorage.setItem('auth', JSON.stringify({
       token: session.access_token, remember: true, originalPath: null,
     }))
@@ -56,5 +50,43 @@
       superUser: session.super_user, userID: session.user_id, userName: session.user_name,
       avatar: session.avatar || '', level: session.level, permissions: session.permissions || {},
     }))
+  }
+  let refreshing = null
+  window.MoviePilotFnos = {
+    // Site authentication changes the real level. Obtain a new token before
+    // reloading the current page so the Vue stores hydrate the updated session.
+    refreshSession () {
+      if (refreshing) return refreshing
+      refreshing = (async () => {
+        for (let attempt = 0; attempt < 30; attempt++) {
+          try {
+            const response = await window.fetch(new URL('v1/login/access-token', apiBase), {
+              method: 'POST', credentials: 'same-origin', cache: 'no-store',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: 'username=admin&password=fnos',
+              signal: AbortSignal.timeout(5000),
+            })
+            if (!response.ok) throw new Error('Native session is not ready')
+            storeSession(await response.json())
+            window.location.reload()
+            return
+          } catch (_) {
+            await new Promise(resolve => window.setTimeout(resolve, 1000))
+          }
+        }
+        // Let the existing startup page show service errors and readiness.
+        window.location.reload()
+      })().finally(() => { refreshing = null })
+      return refreshing
+    },
+  }
+  try {
+    const request = new XMLHttpRequest()
+    request.open('POST', new URL('v1/login/access-token', apiBase).href, false)
+    request.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded')
+    request.send('username=admin&password=fnos')
+    if (request.status !== 200) return
+    const session = JSON.parse(request.responseText)
+    storeSession(session)
   } catch (_) {}
 })()

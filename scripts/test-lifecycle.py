@@ -174,6 +174,44 @@ class LifecycleTests(unittest.TestCase):
         self.env['TRIM_APPNAME'] = 'moviepilot'
         self.hook('install_callback', success=False)
 
+    def test_main_start_replaces_invalid_account_home_for_all_children(self):
+        self.hook('install_callback')
+        public = self.app / 'public'
+        (public / 'node/bin').mkdir(parents=True)
+        supervisor = public / 'backend-supervisor.sh'
+        supervisor.write_text('#!/bin/bash\nenv > "$TRIM_PKGVAR/backend-env.txt"\nexec sleep 120\n')
+        node = public / 'node/bin/node'
+        node.write_text('#!/bin/bash\nenv > "$TRIM_PKGVAR/frontend-env.txt"\nexec sleep 120\n')
+        node.chmod(0o755)
+        self.env.update(HOME='/home/moviepilot-v3', XDG_CACHE_HOME='/not-writable',
+                        CLOAKBROWSER_CACHE_DIR='/not-writable/browser')
+        try:
+            result = subprocess.run(['bash', str(self.cmd / 'main'), 'start'], env=self.env,
+                                    capture_output=True, text=True, timeout=15)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            import time
+            for _ in range(50):
+                if all((self.var / f'{name}-env.txt').exists() for name in ('backend', 'frontend')):
+                    break
+                time.sleep(0.1)
+            for name in ('backend', 'frontend'):
+                values = dict(line.split('=', 1) for line in (self.var / f'{name}-env.txt').read_text().splitlines())
+                self.assertEqual(values['HOME'], str(self.var / 'home'))
+                self.assertEqual(values['CLOAKBROWSER_CACHE_DIR'], str(self.var / 'cache/cloakbrowser'))
+                self.assertEqual(values['PLAYWRIGHT_BROWSERS_PATH'], str(self.var / 'cache/ms-playwright'))
+                self.assertTrue(Path(values['HOME']).is_dir())
+                self.assertTrue(Path(values['CLOAKBROWSER_CACHE_DIR']).is_dir())
+        finally:
+            # Reap processes concurrently so main's kill -0 sees their exit.
+            for name in ('moviepilot-v3.pid', 'moviepilot-v3-frontend.pid', 'moviepilot-v3-log-mirror.pid'):
+                pidfile = self.var / name
+                if pidfile.exists():
+                    pid = int(pidfile.read_text())
+                    try:
+                        os.kill(pid, 15)
+                    except ProcessLookupError:
+                        pass
+
 
 if __name__ == '__main__':
     unittest.main()

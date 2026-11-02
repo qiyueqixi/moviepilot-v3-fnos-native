@@ -103,6 +103,8 @@ def main():
                     assert 'app/application/site/user.sites.v3.bin' in names
                     assert not any(name.endswith('.pyd') or 'user.sites.v2.bin' in name for name in names)
                     assert 'src="./no-auth.js"' in read(app, 'public/index.html').decode()
+                    default_assets = [name for name in names if name.startswith('public/assets/default-') and name.endswith('.js')]
+                    assert sum(read(app, name).count(b'/* fnos-session-refresh */') for name in default_assets) == 1
             results.append({'name': package.name, 'bytes': package.stat().st_size, 'passed': True})
             print('Verified', package.name, flush=True)
     for line in (ROOT / 'dist/SHA256SUMS.txt').read_text().splitlines():

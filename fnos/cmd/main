@@ -38,6 +38,7 @@ ACCESS_PATHS_FILE="${VAR_DIR}/.accessible_paths"
 SOCKET_PATH="${APP_DIR}/moviepilot-v3.sock"
 GATEWAY_PREFIX="/app/moviepilot-v3"
 . "$(dirname "${BASH_SOURCE[0]}")/runtime"
+. "$(dirname "${BASH_SOURCE[0]}")/environment"
 
 pid_running() {
     [ -s "$1" ] || return 1
@@ -99,9 +100,13 @@ start)
         echo "MoviePilot V3 runtime data package is missing: upload the matching Python 3.14 runtime package to the application runtime folder." >>"$LOG_FILE"
         exit 1
     fi
+    if ! prepare_native_environment; then
+        echo 'MoviePilot V3 cannot prepare its private home and browser cache directories.' >>"$LOG_FILE"
+        exit 1
+    fi
     cd "$APP_DIR" || exit 1
     export TZ="${TZ:-Asia/Shanghai}" PUID="${TRIM_UID:-0}" PGID="${TRIM_GID:-0}" UMASK=022
-    # Empty superuser settings keep MoviePilot in no-login mode.
+    # Authentication is provided by the fnOS gateway.
     export HOST="127.0.0.1" PORT="3101" NGINX_PORT="0"
     export PATH="${VENV}/bin:${PATH}" PYTHONNOUSERSITE=1
     export PYTHON_THREAD_INHERIT_CONTEXT=0

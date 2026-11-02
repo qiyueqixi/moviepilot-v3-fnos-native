@@ -100,9 +100,12 @@ jobs:
       - name: Test authorization and patch idempotence
         run: |
           node scripts/test-gateway.cjs
+          node scripts/test-frontend-session.cjs
           python scripts/test-native.py
           python scripts/patch-v3.py .build/source
           python scripts/patch-v3.py .build/source
+          python scripts/patch-frontend.py .build/public
+          python scripts/patch-frontend.py .build/public
       - name: Boot shipped Linux runtime and application
         run: python scripts/test-backend-linux.py --platform "$PLATFORM"
       - name: Verify delivered archives

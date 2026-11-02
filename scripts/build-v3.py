@@ -137,6 +137,7 @@ def prepare_public():
         index.write_text(text, encoding='utf-8', newline='\n')
     for name in ['service.js', 'no-auth.js', 'backend-supervisor.sh', 'loading-background.jpg']:
         shutil.copy2(FNOS / 'resources' / name, public / name)
+    run([os.sys.executable, ROOT / 'scripts/patch-frontend.py', public])
     shutil.copy2(FNOS / 'package.json', public / 'package.json')
     lock = FNOS / 'package-lock.json'
     if lock.exists():

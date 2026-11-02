@@ -24,6 +24,8 @@ def main():
     source = work / 'source'
     source.mkdir(parents=True)
     with tarfile.open(package, 'r:gz') as outer:
+        environment = work / 'environment'
+        environment.write_bytes(outer.extractfile('cmd/environment').read())
         with tarfile.open(fileobj=outer.extractfile('app.tgz'), mode='r|gz') as inner:
             inner.extractall(source, filter='data')
     runtime = ROOT / 'dist' / f'moviepilot-v3-runtime-{args.platform}-python314.tgz'
@@ -37,8 +39,18 @@ def main():
                MOVIEPILOT_AUTO_UPDATE='false', AUTO_UPDATE_RESOURCE='false', GATEWAY_PREFIX='/app/moviepilot-v3',
                MOVIEPILOT_RESOURCE_COOKIE_NAME='MoviePilotV3', PYTHON_THREAD_INHERIT_CONTEXT='0',
                PYTHONIOENCODING='utf-8', PATH=str(python.parent) + os.pathsep + os.environ['PATH'])
+    env['HOME'] = '/home/moviepilot-v3'
+    prepared = subprocess.check_output(['bash', '-c', 'set -e; source "$1"; prepare_native_environment; env -0',
+                                        '--', str(environment)], env=env)
+    env = dict(entry.split('=', 1) for entry in prepared.decode().split('\0') if entry)
     # Exercise native modules and the real SQLite CJK extension before startup.
     doctor = '''import sqlite3, ssl, lxml.etree, cryptography, greenlet, orjson, PIL.Image, psutil, zstandard, crcmod
+import os
+from pathlib import Path
+from cloakbrowser.config import get_cache_dir
+assert Path.home() == Path(os.environ['TRIM_PKGVAR']) / 'home'
+assert get_cache_dir() == Path(os.environ['TRIM_PKGVAR']) / 'cache/cloakbrowser'
+test = get_cache_dir() / '.write-test'; test.write_text('ok'); test.unlink()
 import app.application.site.sites
 c=sqlite3.connect(':memory:'); c.enable_load_extension(True); c.load_extension(%r)
 print('Linux native dependency and CJK imports passed')
@@ -92,7 +104,8 @@ print('Linux native dependency and CJK imports passed')
                     process.wait(timeout=15)
             report = {'passed': True, 'mode': 'safe', 'fresh_database': True, 'persistent_user_id': first_id,
                       'native_imports': True, 'sqlite_cjk': True, 'cookie_scope': True,
-                      'update_guard': True, 'restart': True, 'nas_installation': 'pending'}
+                      'update_guard': True, 'restart': True, 'browser_cache_writable': True,
+                      'nas_installation': 'pending'}
             (ROOT / 'dist' / f'SMOKE-{args.platform}.json').write_text(json.dumps(report, indent=2) + '\n')
             print(json.dumps(report))
         except Exception:
