@@ -34,7 +34,8 @@ def main():
     python = work / 'venv/bin/python3'
     config = work / 'config'
     config.mkdir()
-    env = dict(os.environ, CONFIG_DIR=str(config), TRIM_PKGVAR=str(config), HOST='127.0.0.1',
+    env = dict(os.environ, CONFIG_DIR=str(config), TRIM_PKGVAR=str(config),
+               TRIM_PKGHOME=str(work / 'mapped-home'), TRIM_PKGTMP=str(work / 'mapped-tmp'), HOST='127.0.0.1',
                PORT='39123', NGINX_PORT='0', MOVIEPILOT_SAFE_MODE='true', MOVIEPILOT_NO_AUTH='1',
                MOVIEPILOT_AUTO_UPDATE='false', AUTO_UPDATE_RESOURCE='false', GATEWAY_PREFIX='/app/moviepilot-v3',
                MOVIEPILOT_RESOURCE_COOKIE_NAME='MoviePilotV3', PYTHON_THREAD_INHERIT_CONTEXT='0',
@@ -48,8 +49,10 @@ def main():
 import os
 from pathlib import Path
 from cloakbrowser.config import get_cache_dir
-assert Path.home() == Path(os.environ['TRIM_PKGVAR']) / 'home'
-assert get_cache_dir() == Path(os.environ['TRIM_PKGVAR']) / 'cache/cloakbrowser'
+assert Path.home() == Path(os.environ['TRIM_PKGHOME'])
+assert get_cache_dir() == Path(os.environ['TRIM_PKGHOME']) / '.cache/cloakbrowser'
+import tempfile
+assert Path(tempfile.gettempdir()) == Path(os.environ['TRIM_PKGTMP'])
 test = get_cache_dir() / '.write-test'; test.write_text('ok'); test.unlink()
 import app.application.site.sites
 c=sqlite3.connect(':memory:'); c.enable_load_extension(True); c.load_extension(%r)

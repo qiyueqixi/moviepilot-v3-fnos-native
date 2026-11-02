@@ -33,7 +33,8 @@ class RuntimeTests(unittest.TestCase):
                     target.addfile(member, io.BytesIO(data))
         digest = hashlib.sha256(archive.read_bytes()).hexdigest()
         (app / 'runtime/expected.json').write_text(json.dumps({'sha256': digest}))
-        env = dict(os.environ, TRIM_APPDEST=str(app), TRIM_PKGVAR=str(var))
+        env = dict(os.environ, TRIM_APPDEST=str(app), TRIM_PKGVAR=str(var),
+                   TRIM_PKGHOME=str(root / 'home'), TRIM_PKGTMP=str(root / 'tmp'))
         return app, var, archive, digest, env
 
     def run_helper(self, command, env):

@@ -62,6 +62,7 @@ save_app_proxy() {
 service_postinst() {
     mkdir -p "${TRIM_PKGVAR}/core"
     prepare_native_environment
+    migrate_legacy_environment
     local path
     local -a shares
     IFS=: read -r -a shares <<< "${TRIM_DATA_SHARE_PATHS:-}"
@@ -75,6 +76,7 @@ service_postinst() {
     fi
     prepare_system_log
     chown -R "${TRIM_UID}:${TRIM_GID}" "${TRIM_PKGVAR}" 2>/dev/null || true
+    chown -R "${TRIM_UID}:${TRIM_GID}" "${TRIM_PKGHOME}" "${TRIM_PKGTMP}" 2>/dev/null || true
     chown -R "${TRIM_UID}:${TRIM_GID}" "${TRIM_APPDEST}" 2>/dev/null || true
     for path in "${shares[@]}"; do
         [ -z "$path" ] || chown "${TRIM_UID}:${TRIM_GID}" "$path" 2>/dev/null || true
@@ -105,11 +107,12 @@ cleanup_targets() {
             *) install_log "Refusing unexpected shared data path: $path"; return 1 ;;
         esac
     done
-    for kind in PKGVAR PKGETC PKGHOME; do
+    for kind in PKGVAR PKGETC PKGHOME PKGTMP; do
         case "$kind" in
             PKGVAR) path="${TRIM_PKGVAR:-}"; kind=@appdata ;;
             PKGETC) path="${TRIM_PKGETC:-}"; kind=@appconf ;;
             PKGHOME) path="${TRIM_PKGHOME:-}"; kind=@apphome ;;
+            PKGTMP) path="${TRIM_PKGTMP:-}"; kind=@apptemp ;;
         esac
         [ -n "$path" ] || continue
         resolved="$(realpath -m -- "$path")" || return 1

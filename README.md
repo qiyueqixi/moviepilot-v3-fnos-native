@@ -1,6 +1,6 @@
 # MoviePilot V3 飞牛原生 FPK
 
-独立的 MoviePilot **3.2.3-3** 安装包工程，目标为 fnOS 1.2.0 及以上的 x86_64 / ARM64 设备。采用原生 Python 和 Node.js 服务运行。
+独立的 MoviePilot **3.2.3-4** 安装包工程，目标为 fnOS 1.2.0 及以上的 x86_64 / ARM64 设备。采用原生 Python 和 Node.js 服务运行。
 
 ## 与 V2 同时安装
 
@@ -22,8 +22,8 @@ V3 新建自己的配置和数据库。安装 V3 时无需卸载 V2；两者不�
 
 构建产物在 `dist/`：
 
-- `moviepilot-v3_3.2.3-3_x86.fpk`：x86 完整离线包。
-- `moviepilot-v3_3.2.3-3_arm.fpk`：ARM64 完整离线包。
+- `moviepilot-v3_3.2.3-4_x86.fpk`：x86 完整离线包。
+- `moviepilot-v3_3.2.3-4_arm.fpk`：ARM64 完整离线包。
 - 文件名带 `_installer` 的包：拆分安装包，需要同批次对应架构的运行时。
 - `moviepilot-v3-runtime-{x86|arm}-python314.tgz`：拆分运行时。
 - `SHA256SUMS.txt`：产物校验值。
@@ -38,6 +38,19 @@ V3 新建自己的配置和数据库。安装 V3 时无需卸载 V2；两者不�
 启动页会等待 `/health/ready` 返回成功；初始化失败可查看应用文件 `logs/moviepilot-v3.log`。支持在 `config/` 放置 `loading-background.jpg` 等背景图片。
 
 ## 安装、升级与卸载
+
+按飞牛应用目录规范使用系统提供的映射，不依赖 `/home/moviepilot-v3` 或固定磁盘编号：
+
+| 用途 | fnOS 环境变量 / 目录 |
+| --- | --- |
+| 程序及内置资源 | `TRIM_APPDEST`，系统 `target` 映射 |
+| 持久运行数据、Python 环境 | `TRIM_PKGVAR`，系统 `var` 映射 |
+| 用户主目录 | `TRIM_PKGHOME`，系统 `home` 映射 |
+| XDG 与浏览器缓存 | `${TRIM_PKGHOME}/.cache` |
+| 临时文件 | `TRIM_PKGTMP`，系统 `tmp` 映射 |
+| 用户可见配置、日志、导出和运行时上传 | `config/resource` 声明，通过 `TRIM_DATA_SHARE_PATHS` 获取 |
+
+从 3.2.3-3 升级时会把旧私有 home/cache 复制到映射目录，不覆盖已存在的新文件，旧副本保留供恢复。
 
 完整包安装时初始化独立数据目录，校验并解压匹配的运行时；拆分包允许先安装，上传运行时后再启动。安装出错会返回失败并在飞牛安装提示中记录原因，可保留数据后重试。
 

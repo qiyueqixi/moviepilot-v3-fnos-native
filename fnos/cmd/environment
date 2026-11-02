@@ -1,15 +1,32 @@
 #!/bin/bash
 
 prepare_native_environment() {
-    # The package account's passwd HOME may be /home/moviepilot-v3, which fnOS
-    # does not provision. Keep all writable user state under our private data.
-    export HOME="${TRIM_PKGVAR:?}/home"
-    export XDG_CACHE_HOME="${TRIM_PKGVAR}/cache"
+    # Use fnOS mappings; the passwd HOME (/home/moviepilot-v3) is not the
+    # application's mapped home. Do not infer a disk or duplicate home in var.
+    export HOME="${TRIM_PKGHOME:?fnOS TRIM_PKGHOME is required}"
+    export TMPDIR="${TRIM_PKGTMP:?fnOS TRIM_PKGTMP is required}"
+    export XDG_CACHE_HOME="${HOME}/.cache"
     export XDG_CONFIG_HOME="${HOME}/.config"
     export XDG_DATA_HOME="${HOME}/.local/share"
     export CLOAKBROWSER_CACHE_DIR="${XDG_CACHE_HOME}/cloakbrowser"
     export PLAYWRIGHT_BROWSERS_PATH="${XDG_CACHE_HOME}/ms-playwright"
-    mkdir -p -- "$HOME" "$XDG_CACHE_HOME" "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" \
+    mkdir -p -- "$HOME" "$TMPDIR" "$XDG_CACHE_HOME" "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" \
         "$CLOAKBROWSER_CACHE_DIR" "$PLAYWRIGHT_BROWSERS_PATH" || return 1
-    [ -w "$HOME" ] && [ -w "$CLOAKBROWSER_CACHE_DIR" ] || return 1
+    [ -w "$HOME" ] && [ -w "$TMPDIR" ] && [ -w "$CLOAKBROWSER_CACHE_DIR" ] || return 1
+}
+
+migrate_legacy_environment() {
+    # 3.2.3-3 placed user state in var. Copy it once without replacing any
+    # newer files in the mapped home, and retain the originals for recovery.
+    local marker="${HOME}/.fnos-home-migrated-v1"
+    [ ! -f "$marker" ] || return 0
+    local legacy="${TRIM_PKGVAR:?}/home"
+    if [ -d "$legacy" ] && [ "$(realpath -m -- "$legacy")" != "$(realpath -m -- "$HOME")" ]; then
+        cp -a -n -- "$legacy/." "$HOME/" || return 1
+    fi
+    legacy="${TRIM_PKGVAR}/cache"
+    if [ -d "$legacy" ] && [ "$(realpath -m -- "$legacy")" != "$(realpath -m -- "$XDG_CACHE_HOME")" ]; then
+        cp -a -n -- "$legacy/." "$XDG_CACHE_HOME/" || return 1
+    fi
+    touch "$marker"
 }

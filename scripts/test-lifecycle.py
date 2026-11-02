@@ -25,14 +25,16 @@ class LifecycleTests(unittest.TestCase):
         self.var = self.volume / '@appdata/moviepilot-v3'
         self.etc = self.volume / '@appconf/moviepilot-v3'
         self.home = self.volume / '@apphome/moviepilot-v3'
+        self.tmp = self.volume / '@apptemp/moviepilot-v3'
         self.shares = [self.volume / 'shares/moviepilot-v3' / name
                        for name in ('config', 'logs', 'exports', 'runtime')]
         self.cmd = self.base / 'package scripts/cmd'
         shutil.copytree(ROOT / 'fnos/cmd', self.cmd)
-        for directory in [self.app, self.var, self.etc, self.home, *self.shares]:
+        for directory in [self.app, self.var, self.etc, self.home, self.tmp, *self.shares]:
             directory.mkdir(parents=True)
         self.env = dict(os.environ, TRIM_APPNAME='moviepilot-v3', TRIM_APPDEST=str(self.app),
                         TRIM_PKGVAR=str(self.var), TRIM_PKGETC=str(self.etc), TRIM_PKGHOME=str(self.home),
+                        TRIM_PKGTMP=str(self.tmp),
                         TRIM_DATA_SHARE_PATHS=':'.join(map(str, self.shares)),
                         TRIM_DATA_ACCESSIBLE_PATHS=str(self.volume / 'media'),
                         TRIM_TEMP_LOGFILE=str(self.base / 'install result.log'),
@@ -196,9 +198,10 @@ class LifecycleTests(unittest.TestCase):
                 time.sleep(0.1)
             for name in ('backend', 'frontend'):
                 values = dict(line.split('=', 1) for line in (self.var / f'{name}-env.txt').read_text().splitlines())
-                self.assertEqual(values['HOME'], str(self.var / 'home'))
-                self.assertEqual(values['CLOAKBROWSER_CACHE_DIR'], str(self.var / 'cache/cloakbrowser'))
-                self.assertEqual(values['PLAYWRIGHT_BROWSERS_PATH'], str(self.var / 'cache/ms-playwright'))
+                self.assertEqual(values['HOME'], str(self.home))
+                self.assertEqual(values['TMPDIR'], str(self.tmp))
+                self.assertEqual(values['CLOAKBROWSER_CACHE_DIR'], str(self.home / '.cache/cloakbrowser'))
+                self.assertEqual(values['PLAYWRIGHT_BROWSERS_PATH'], str(self.home / '.cache/ms-playwright'))
                 self.assertTrue(Path(values['HOME']).is_dir())
                 self.assertTrue(Path(values['CLOAKBROWSER_CACHE_DIR']).is_dir())
         finally:
@@ -211,6 +214,22 @@ class LifecycleTests(unittest.TestCase):
                         os.kill(pid, 15)
                     except ProcessLookupError:
                         pass
+
+    def test_legacy_home_and_cache_migrate_once_without_overwriting_newer_files(self):
+        (self.var / 'home/.config').mkdir(parents=True)
+        (self.var / 'home/.config/settings').write_text('legacy')
+        (self.var / 'cache/cloakbrowser').mkdir(parents=True)
+        (self.var / 'cache/cloakbrowser/chrome').write_text('cached browser')
+        (self.home / '.config').mkdir()
+        (self.home / '.config/settings').write_text('newer')
+        self.hook('upgrade_callback')
+        self.assertEqual((self.home / '.config/settings').read_text(), 'newer')
+        browser = self.home / '.cache/cloakbrowser/chrome'
+        self.assertEqual(browser.read_text(), 'cached browser')
+        self.assertTrue((self.var / 'cache/cloakbrowser/chrome').exists())
+        browser.unlink()
+        self.hook('upgrade_callback')
+        self.assertFalse(browser.exists(), 'Migration must not undo a later intentional cache clear')
 
 
 if __name__ == '__main__':
