@@ -1,6 +1,6 @@
 [
   {
-    "stepTitle": "卸载 MoviePilot",
+    "stepTitle": "卸载 MoviePilot V3",
     "items": [
       {
         "type": "radio",
@@ -8,9 +8,13 @@
         "label": "应用数据处理方式",
         "initValue": "false",
         "options": [
-          { "label": "保留现有数据", "value": "false" },
-          { "label": "删除全部应用数据", "value": "true" }
+          { "label": "保留 V3 配置、数据库及应用数据（默认）", "value": "false" },
+          { "label": "删除 V3 配置、数据库、日志和运行时", "value": "true" }
         ]
+      },
+      {
+        "type": "tips",
+        "helpText": "卸载前会停止 V3 后端、网页网关和日志进程。删除数据只清理 V3 自身目录；媒体库、下载目录及 V2 数据均保留。选择保留后，重新安装可继续使用原配置。"
       }
     ]
   }

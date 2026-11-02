@@ -59,15 +59,24 @@ save_app_proxy() {
 }
 
 service_postinst() {
+    mkdir -p "${TRIM_PKGVAR}/core"
+    local path
+    local -a shares
+    IFS=: read -r -a shares <<< "${TRIM_DATA_SHARE_PATHS:-}"
+    for path in "${shares[@]}"; do
+        [ -z "$path" ] || mkdir -p -- "$path"
+    done
     [ -z "${wizard_proxy:-}" ] || save_app_proxy "$wizard_proxy"
     local bundled_runtime="${TRIM_APPDEST}/runtime/venv.tgz"
     if [ -f "$bundled_runtime" ]; then
         runtime_install_archive "$bundled_runtime" || { install_log "离线运行时校验或解压失败"; return 1; }
     fi
-    mkdir -p "${TRIM_PKGVAR}/core"
     prepare_system_log
     chown -R "${TRIM_UID}:${TRIM_GID}" "${TRIM_PKGVAR}" 2>/dev/null || true
     chown -R "${TRIM_UID}:${TRIM_GID}" "${TRIM_APPDEST}" 2>/dev/null || true
+    for path in "${shares[@]}"; do
+        [ -z "$path" ] || chown "${TRIM_UID}:${TRIM_GID}" "$path" 2>/dev/null || true
+    done
 }
 
 service_postconfig() {
@@ -78,78 +87,54 @@ service_postconfig() {
     fi
 }
 
-remove_shared_data() {
-    local paths="${TRIM_DATA_SHARE_PATHS:-}"
-    local path=""
-    local parent=""
-
-    while [ -n "$paths" ]; do
-        case "$paths" in
-            *:*)
-                path="${paths%%:*}"
-                paths="${paths#*:}"
-                ;;
-            *)
-                path="$paths"
-                paths=""
-                ;;
-        esac
-
-        # Delete only data-share paths declared by this package.
-        case "$path" in
-            */moviepilot-v3/config|*/moviepilot-v3/logs|*/moviepilot-v3/exports|*/moviepilot-v3/runtime)
-                [ -d "$path" ] && rm -rf -- "$path"
-                parent="${path%/*}"
-                ;;
-            *)
-                install_log "Skip unexpected shared path: $path"
-                ;;
+cleanup_targets() {
+    [ "${TRIM_APPNAME:-}" = moviepilot-v3 ] || return 1
+    local path resolved kind
+    local -a shares
+    IFS=: read -r -a shares <<< "${TRIM_DATA_SHARE_PATHS:-}"
+    for path in "${shares[@]}"; do
+        [ -n "$path" ] || continue
+        # Resolve aliases before checking identity; a share symlink must not
+        # redirect deletion into V2, a media library or a download directory.
+        resolved="$(realpath -m -- "$path")" || return 1
+        case "$resolved" in
+            /*/moviepilot-v3/config|/*/moviepilot-v3/logs|/*/moviepilot-v3/exports|/*/moviepilot-v3/runtime)
+                printf '%s\n' "$resolved" ;;
+            *) install_log "Refusing unexpected shared data path: $path"; return 1 ;;
         esac
     done
-
-    # Remove the application root only when nothing else remains in it.
-    [ -z "$parent" ] || rmdir "$parent" 2>/dev/null || true
+    for kind in PKGVAR PKGETC PKGHOME; do
+        case "$kind" in
+            PKGVAR) path="${TRIM_PKGVAR:-}"; kind=@appdata ;;
+            PKGETC) path="${TRIM_PKGETC:-}"; kind=@appconf ;;
+            PKGHOME) path="${TRIM_PKGHOME:-}"; kind=@apphome ;;
+        esac
+        [ -n "$path" ] || continue
+        resolved="$(realpath -m -- "$path")" || return 1
+        case "$resolved" in
+            /*/"$kind"/moviepilot-v3) printf '%s\n' "$resolved" ;;
+            *) install_log "Refusing unexpected private data path: $path"; return 1 ;;
+        esac
+    done
 }
 
-remove_private_data_roots() {
-    local app_name="${TRIM_APPNAME:-}"
-    local volume_root=""
-    local target=""
-
-    [ "$app_name" = "moviepilot-v3" ] || { install_log "Skip private data cleanup for unexpected app: $app_name"; return 1; }
-    case "${TRIM_PKGVAR:-}" in
-        */@appdata/moviepilot-v3) volume_root="${TRIM_PKGVAR%/@appdata/moviepilot-v3}" ;;
-        *) install_log "Skip private data cleanup for unexpected TRIM_PKGVAR: ${TRIM_PKGVAR:-}"; return 1 ;;
-    esac
-
-    for target in \
-        "${volume_root}/@appdata/moviepilot-v3" \
-        "${volume_root}/@apphome/moviepilot-v3" \
-        "${volume_root}/@appconf/moviepilot-v3" \
-        "${volume_root}/@appmeta/moviepilot-v3" \
-        "${volume_root}/@apptemp/moviepilot-v3" \
-        "${volume_root}/@appshare/moviepilot-v3"; do
-        case "$target" in
-            "${volume_root}"/@appdata/moviepilot-v3|\
-            "${volume_root}"/@apphome/moviepilot-v3|\
-            "${volume_root}"/@appconf/moviepilot-v3|\
-            "${volume_root}"/@appmeta/moviepilot-v3|\
-            "${volume_root}"/@apptemp/moviepilot-v3|\
-            "${volume_root}"/@appshare/moviepilot-v3)
-                [ ! -e "$target" ] || rm -rf -- "$target"
-                ;;
-            *)
-                install_log "Skip unexpected private data path: $target"
-                return 1
-                ;;
-        esac
-    done
+validate_cleanup_paths() {
+    cleanup_targets > /dev/null
 }
 
 service_postuninst() {
     [ "${wizard_delete_data:-false}" = "true" ] || return 0
-    remove_shared_data
-    remove_private_data_roots
+    local targets path parent
+    # Capture successfully validated targets before the first destructive step.
+    targets="$(cleanup_targets)" || return 1
+    while IFS= read -r path; do
+        [ -n "$path" ] || continue
+        rm -rf -- "$path"
+        parent="${path%/*}"
+        case "$parent" in
+            */moviepilot-v3) rmdir -- "$parent" 2>/dev/null || true ;;
+        esac
+    done <<< "$targets"
 }
 
 service_postupgrade() {
