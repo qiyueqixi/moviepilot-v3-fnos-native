@@ -49,7 +49,6 @@ jobs:
       - name: Gateway, runtime upgrade and proxy regressions
         run: |
           node scripts/test-session.cjs
-          node scripts/test-gateway.cjs
           python scripts/test-runtime.py
           python scripts/test-upstream.py
           for script in fnos/cmd/* fnos/resources/backend-supervisor.sh; do bash -n "$script"; done
@@ -96,6 +95,7 @@ jobs:
         run: python scripts/build-v3.py --platform "$PLATFORM" --uv uv --zig "$ZIG"
       - name: Test authorization and patch idempotence
         run: |
+          node scripts/test-gateway.cjs
           python scripts/test-native.py
           python scripts/patch-v3.py .build/source
           python scripts/patch-v3.py .build/source
