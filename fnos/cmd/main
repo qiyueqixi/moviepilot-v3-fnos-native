@@ -39,6 +39,7 @@ SOCKET_PATH="${APP_DIR}/moviepilot-v3.sock"
 GATEWAY_PREFIX="/app/moviepilot-v3"
 . "$(dirname "${BASH_SOURCE[0]}")/runtime"
 . "$(dirname "${BASH_SOURCE[0]}")/environment"
+. "$(dirname "${BASH_SOURCE[0]}")/authorization"
 
 pid_running() {
     [ -s "$1" ] || return 1
@@ -94,8 +95,7 @@ start)
     is_running && exit 0
     mkdir -p "$VAR_DIR" "${VAR_DIR}/core" "$CONFIG_DIR" "$LOG_DIR" "$EXPORT_DIR" "$RUNTIME_DIR"
     trim_legacy_log
-    printf '%s' "${TRIM_DATA_ACCESSIBLE_PATHS:-}" > "$ACCESS_PATHS_FILE"
-    chmod 600 "$ACCESS_PATHS_FILE"
+    publish_authorized_paths || exit 1
     if ! install_runtime; then
         echo "MoviePilot V3 runtime data package is missing: upload the matching Python 3.14 runtime package to the application runtime folder." >>"$LOG_FILE"
         exit 1

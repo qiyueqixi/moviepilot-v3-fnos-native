@@ -1,0 +1,24 @@
+#!/bin/bash
+
+publish_authorized_paths() {
+    local snapshot="${TRIM_PKGVAR:?}/.accessible_paths"
+    local staged
+    mkdir -p -- "$TRIM_PKGVAR" || return 1
+    staged="$(mktemp "${snapshot}.XXXXXX")" || return 1
+    # Publish even an empty value: removing the last grant must revoke access.
+    if ! printf '%s' "${TRIM_DATA_ACCESSIBLE_PATHS:-}" > "$staged" || ! chmod 600 "$staged"; then
+        rm -f -- "$staged"
+        return 1
+    fi
+    # config_callback can run as root, while the backend runs as package user.
+    if [ -n "${TRIM_UID:-}" ] && [ -n "${TRIM_GID:-}" ]; then
+        if ! chown "${TRIM_UID}:${TRIM_GID}" "$staged"; then
+            rm -f -- "$staged"
+            return 1
+        fi
+    fi
+    if ! mv -f -- "$staged" "$snapshot"; then
+        rm -f -- "$staged"
+        return 1
+    fi
+}

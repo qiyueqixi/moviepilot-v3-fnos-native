@@ -4,6 +4,7 @@ set -e
 VENV="${TRIM_PKGVAR}/venv"
 . "$(dirname "${BASH_SOURCE[0]}")/runtime"
 . "$(dirname "${BASH_SOURCE[0]}")/environment"
+. "$(dirname "${BASH_SOURCE[0]}")/authorization"
 
 prepare_system_log() {
     local system_log="/var/log/apps/${TRIM_APPNAME:-moviepilot-v3}.log"
@@ -84,6 +85,9 @@ service_postinst() {
 }
 
 service_postconfig() {
+    # The running backend re-reads this snapshot on every filesystem operation.
+    # Update it here instead of waiting for main start to copy the environment.
+    publish_authorized_paths
     if [ -n "${wizard_proxy:-}" ]; then
         save_app_proxy "$wizard_proxy"
     elif [ "${wizard_clear_app_proxy:-false}" = "true" ]; then

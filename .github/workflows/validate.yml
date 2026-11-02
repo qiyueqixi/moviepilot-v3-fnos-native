@@ -1,0 +1,27 @@
+name: Validate native adapters (no packages)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check native lifecycle and live authorization without building packages
+        run: |
+          python scripts/test-runtime.py
+          python scripts/test-lifecycle.py
+          python scripts/test-authorization.py
+          python scripts/test-upstream.py
+          node scripts/test-session.cjs
+          for script in fnos/cmd/* fnos/resources/backend-supervisor.sh; do bash -n "$script"; done

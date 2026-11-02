@@ -54,6 +54,7 @@ jobs:
           node scripts/test-session.cjs
           python scripts/test-runtime.py
           python scripts/test-lifecycle.py
+          python scripts/test-authorization.py
           python scripts/test-upstream.py
           for script in fnos/cmd/* fnos/resources/backend-supervisor.sh; do bash -n "$script"; done
       - uses: actions/upload-artifact@v4
