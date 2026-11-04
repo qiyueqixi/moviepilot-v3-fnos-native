@@ -16,19 +16,10 @@ proxy.on('error', (_error, _req, res) => {
   if (res.writeHead) res.writeHead(502, { 'Content-Type': 'application/json' })
   res.end('{"success":false,"message":"后台服务暂不可用"}')
 })
-const assetsPath = path.join(__dirname, 'assets')
 const indexPath = path.join(__dirname, 'index.html')
 const configPath = process.env.CONFIG_DIR || path.join(__dirname, '..', 'config')
 const logPath = process.env.MOVIEPILOT_LOG_FILE || path.join(configPath, '..', 'logs', 'moviepilot-v3.log')
 const backendPidPath = process.env.MOVIEPILOT_PID_FILE || ''
-const fnosScale = 0.92
-const fnosCompactStyle = `<style id="fnos-compact-ui">
-@media (min-width: 900px) {
-  html {
-    zoom: ${fnosScale};
-  }
-}
-</style>`
 const loadingBackgroundNames = [
   'loading-background.webp',
   'loading-background.jpg',
@@ -227,21 +218,6 @@ function startupState () {
   return { status, error }
 }
 
-function scaleMediaQueries (css) {
-  return css.replace(/@media[^\{]+/g, query => query.replace(/(\d+(?:\.\d+)?)px/g, (_match, value) => {
-    const scaled = Math.round(Number(value) * fnosScale * 100) / 100
-    return `${scaled}px`
-  }))
-}
-
-function scaleVuetifyBreakpoints (javascript) {
-  const scaled = value => Math.round(value * fnosScale * 100) / 100
-  return javascript.replace(
-    'lg:1280,xl:1920,xxl:2560',
-    `lg:${scaled(1280)},xl:${scaled(1920)},xxl:${scaled(2560)}`,
-  )
-}
-
 function sendIndex (req, res) {
   if (!isBackendReady) {
     const pathname = new URL(req.originalUrl, 'http://localhost').pathname
@@ -254,11 +230,6 @@ function sendIndex (req, res) {
     if (error) {
       res.sendStatus(500)
       return
-    }
-    if (req.query.fnos === '1') {
-      html = html
-        .replaceAll('./assets/', './fnos-assets/')
-        .replace('</head>', `${fnosCompactStyle}</head>`)
     }
     if (req.originalUrl.startsWith(`${gatewayPrefix}/`) || req.originalUrl === gatewayPrefix) {
       html = html
@@ -300,30 +271,6 @@ app.get('/fnos-loading-background', (_req, res) => {
   res.set('Cache-Control', 'no-cache').sendFile(background)
 })
 
-app.use('/fnos-assets', (req, res, next) => {
-  const assetName = path.basename(req.path)
-  if (!assetName || req.path !== `/${assetName}`) {
-    res.sendStatus(404)
-    return
-  }
-  const extension = path.extname(assetName)
-  if (extension !== '.css' && extension !== '.js') {
-    next()
-    return
-  }
-  fs.readFile(path.join(assetsPath, assetName), 'utf8', (error, content) => {
-    if (error) {
-      res.sendStatus(error.code === 'ENOENT' ? 404 : 500)
-      return
-    }
-    const transformed = extension === '.css'
-      ? scaleMediaQueries(content)
-      : scaleVuetifyBreakpoints(content)
-    res.set('Cache-Control', 'no-store')
-    res.type(extension).send(transformed)
-  })
-})
-app.use('/fnos-assets', express.static(assetsPath))
 app.get(['/', '/index.html'], sendIndex)
 app.use(express.static(__dirname, { index: false }))
 // Install native dependency and source updates together through FPK.

@@ -5,6 +5,7 @@ const { spawn } = require('node:child_process')
 const { setTimeout: delay } = require('node:timers/promises')
 const { once } = require('node:events')
 const path = require('node:path')
+const fs = require('node:fs')
 
 async function listen (server) {
   server.listen(0, '127.0.0.1')
@@ -59,7 +60,21 @@ async function main () {
     const html = await (await fetch(prefix + '/?fnos=1')).text()
     assert.match(html, /<base href="\/app\/moviepilot-v3\/">/)
     assert.match(html, /src="\.\/no-auth.js"/)
-    assert.match(html, /fnos-compact-ui/)
+    assert.doesNotMatch(html, /fnos-compact-ui|fnos-assets/)
+    assert.equal(await (await fetch(prefix + '/')).text(), html, 'Legacy fnos query must not change the layout')
+    for (const extension of ['.css', '.js']) {
+      const asset = fs.readdirSync('.build/public/assets').find(name => name.endsWith(extension))
+      assert.ok(asset, `Missing upstream ${extension} asset`)
+      const response = await fetch(prefix + '/assets/' + asset)
+      assert.equal(response.status, 200)
+      assert.deepEqual(Buffer.from(await response.arrayBuffer()), fs.readFileSync(path.join('.build/public/assets', asset)),
+        `Gateway must serve upstream ${extension} bytes unchanged`)
+    }
+    ready = false
+    assert.equal((await (await fetch(prefix + '/fnos-ready')).json()).ready, false)
+    assert.match(await (await fetch(prefix + '/')).text(), /正在启动/)
+    ready = true
+    assert.equal((await (await fetch(prefix + '/fnos-ready')).json()).ready, true)
     const api = await (await fetch(prefix + '/api/v1/test?x=1')).json()
     assert.equal(api.path, '/api/v1/test?x=1')
     const blocked = await fetch(prefix + '/api/v1/system/update/install', { method: 'POST' })
@@ -82,7 +97,7 @@ async function main () {
       })
     })
     assert.equal(upgradedPath, '/api/v1/ws?token=x')
-    console.log('Gateway readiness, prefix, API query, update guard, SSE streaming and WebSocket upgrade tests passed')
+    console.log('Gateway startup page, original UI assets, prefix, API query, update guard, SSE and WebSocket tests passed')
   } finally {
     child.kill()
     backend.closeAllConnections()

@@ -9,7 +9,7 @@
             "protocol": "",
             "gatewayPrefix": "/app/moviepilot-v3",
             "gatewaySocket": "moviepilot-v3.sock",
-            "url": "/app/moviepilot-v3/?fnos=1",
+            "url": "/app/moviepilot-v3/",
             "allUsers": true
         }
     }

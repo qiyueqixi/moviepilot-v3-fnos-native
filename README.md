@@ -37,6 +37,8 @@ V3 新建自己的配置和数据库。安装 V3 时无需卸载 V2；两者不�
 
 启动页会等待 `/health/ready` 返回成功；初始化失败可查看应用文件 `logs/moviepilot-v3.log`。支持在 `config/` 放置 `loading-background.jpg` 等背景图片。
 
+应用页面使用上游 V3 的原始布局和响应式断点，不注入页面缩放样式。飞牛访问路径、免登录和认证后会话刷新由适配层处理。
+
 ## 安装、升级与卸载
 
 按飞牛应用目录规范使用系统提供的映射，不依赖 `/home/moviepilot-v3` 或固定磁盘编号：
@@ -74,7 +76,7 @@ V3 新建自己的配置和数据库。安装 V3 时无需卸载 V2；两者不�
 
 ## 开发与构建
 
-GitHub 私有仓库：[moviepilot-v3-fnos-native](https://github.com/qiyueqixi/moviepilot-v3-fnos-native)。
+GitHub 公开仓库：[moviepilot-v3-fnos-native](https://github.com/qiyueqixi/moviepilot-v3-fnos-native)。
 `Upstream V3 native FPK` 工作流每 6 小时检查稳定版 V3，也支持在 Actions 页面手动指定版本及重建草稿。
 后端声明的前端版本、源码提交、站点资源提交会在一次检查中锁定，两个架构共用同一份输入；不跟随 V2、V4 或预发布版。
 若 Python 要求改变、补丁失配、代理源码发生额外改写、依赖导入或启动测试失败，流程停止，不生成新版 Release。
