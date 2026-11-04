@@ -1,6 +1,6 @@
 # MoviePilot V3 飞牛原生 FPK
 
-独立的 MoviePilot **3.2.3-5** 安装包工程，目标为 fnOS 1.2.0 及以上的 x86_64 / ARM64 设备。采用原生 Python 和 Node.js 服务运行。
+独立的 MoviePilot **3.2.3-6** 安装包工程，目标为 fnOS 1.2.0 及以上的 x86_64 / ARM64 设备。采用原生 Python 和 Node.js 服务运行。
 
 ## 与 V2 同时安装
 
@@ -22,8 +22,8 @@ V3 新建自己的配置和数据库。安装 V3 时无需卸载 V2；两者不�
 
 构建产物在 `dist/`：
 
-- `moviepilot-v3_3.2.3-5_x86.fpk`：x86 完整离线包。
-- `moviepilot-v3_3.2.3-5_arm.fpk`：ARM64 完整离线包。
+- `moviepilot-v3_3.2.3-6_x86.fpk`：x86 完整离线包。
+- `moviepilot-v3_3.2.3-6_arm.fpk`：ARM64 完整离线包。
 - 文件名带 `_installer` 的包：拆分安装包，需要同批次对应架构的运行时。
 - `moviepilot-v3-runtime-{x86|arm}-python314.tgz`：拆分运行时。
 - `SHA256SUMS.txt`：产物校验值。
